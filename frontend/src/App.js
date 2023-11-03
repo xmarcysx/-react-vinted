@@ -1,8 +1,18 @@
 import './App.css';
+import 'primereact/resources/themes/lara-light-indigo/theme.css';
+
+import { PrimeReactProvider } from 'primereact/api';
+import Navbar from './components/Navbar';
+import VintedFilterList from './components/VintedFilterList';
 
 function App() {
   return (
-    <h1 className="text-3xl font-bold underline bg-purple-600">Hello world!</h1>
+    <>
+      <PrimeReactProvider>
+        <Navbar></Navbar>
+        <VintedFilterList></VintedFilterList>
+      </PrimeReactProvider>
+    </>
   );
 }
 
