@@ -1,47 +1,67 @@
 const express = require('express');
-const { fetchData } = require('./vinted-api');
-const { readGamesData, sortGamesByFavourites } = require('./games');
-const { readPuzzleData, sortPuzzleByFavourites } = require('./puzzle');
-const { readUnoData, sortUnoByFavourites } = require('./uno');
-const { readWatchData, sortWatchByFavourites } = require('./watch');
+const axios = require('axios');
+const cors = require('cors');
 
 const app = express();
-const port = 3000;
+const port = 3001;
 
-// Endpoint zwracający dane dla vinted
-app.get('/data', async (req, res) => {
-  const data = await fetchData();
-  res.json(data);
-});
+app.use(express.json());
 
-// Endpointy dla gier
-app.get('/games/favourites', (req, res) => {
-  const games = readGamesData();
-  const sortedGames = sortGamesByFavourites(games);
-  res.json(sortedGames);
-});
+app.use(cors());
 
-// Endpointy dla puzzli
-app.get('/puzzle/favourites', (req, res) => {
-  const puzzle = readPuzzleData();
-  const sortedPuzzle = sortPuzzleByFavourites(puzzle);
-  res.json(sortedPuzzle);
-});
+app.get('/api', async (req, res) => {
+  try {
+    const searchText = req.query.title;
+    const sortBy = req.query.sortBy;
+    let priceFrom = req.query.priceFrom;
+    let priceTo = req.query.priceTo;
+    const page = req.query.page;
 
-// Endpointy dla uno
-app.get('/uno/favourites', (req, res) => {
-  const uno = readUnoData();
-  const sortedUno = sortUnoByFavourites(uno);
-  res.json(sortedUno);
-});
+    if (priceFrom === '') priceFrom = 0;
+    if (priceTo === '') priceTo = 100000000;
 
-// Endpointy dla watch
-app.get('/watch/favourites', (req, res) => {
-  const watch = readWatchData();
-  const sortedWatch = sortWatchByFavourites(watch);
-  res.json(sortedWatch);
+    const firstUrl = 'https://www.vinted.fr/';
+    const firstResponse = await axios.get(firstUrl);
+
+    const cookies = firstResponse.headers['set-cookie'];
+
+    const targetCookie = cookies.find((cookieStr) =>
+      cookieStr.includes('_vinted_fr_session')
+    );
+
+    if (targetCookie) {
+      const cookieString = targetCookie.split(';')[0];
+
+      const secondUrl = `https://www.vinted.pl/api/v2/catalog/items?search_text=${searchText}&currency=PLN&price_from=${priceFrom}&price_to=${priceTo}&order=${
+        sortBy === 'likes_high_to_low' || 'likes_low_to_high' ? sortBy : ''
+      }&page=${page}`;
+
+      const secondResponse = await axios.get(secondUrl, {
+        headers: {
+          Cookie: cookieString,
+        },
+      });
+
+      if (sortBy === 'likes_high_to_low') {
+        secondResponse.data.items.sort(
+          (a, b) => b.favourite_count - a.favourite_count
+        );
+      } else if (sortBy === 'likes_low_to_high') {
+        secondResponse.data.items.sort(
+          (a, b) => a.favourite_count - b.favourite_count
+        );
+      }
+
+      res.send(secondResponse.data);
+    } else {
+      res.status(500).send('Cookie not found');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).send('An error occurred.');
+  }
 });
 
 app.listen(port, () => {
-  console.log(`Serwer działa na porcie ${port}`);
+  console.log(`Express app listening at http://localhost:${port}`);
 });
